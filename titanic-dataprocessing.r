@@ -75,9 +75,9 @@ table(combi$Title)
 # Reading the data feature description page, the SibSp feature counts Siblings and Spouces
 # and the Parch feature countsParents and Children
 # The total family size is then SibSp + Parch + 1 for the person
-combi$FamilySize <- combi$SibSp + combi$Parch + 1
+combi$FamSize <- combi$SibSp + combi$Parch + 1
 
-# Extract the engineered feature FamilyId from the dataset
+# Extract the engineered feature FamId from the dataset
 # Again following Trevor Stephens tutorial, it makes sense to engineer a feature that describes
 # the family size. The idea being that large family have a harder (or is it easier?) time keeping track
 # of family members to get into a lifeboat
@@ -88,20 +88,20 @@ combi$Surname <- sapply(as.character(combi$Name), FUN=function(x) {strsplit(x, s
 combi$Surname <- factor(combi$Surname)
 
 # Combine the Surname with the family size
-combi$FamilyId <- paste(as.character(combi$FamilySize), as.character(combi$Surname), sep="-")
+combi$FamId <- paste(as.character(combi$FamSize), as.character(combi$Surname), sep="-")
 # Group individuals and couples together
-combi$FamilyId[combi$FamilySize == 1] <- 'Singles'
-combi$FamilyId[combi$FamilySize == 2] <- 'Couples'
-# Somehow there are some families that don't match the FamilySize
+combi$FamId[combi$FamSize == 1] <- 'Singles'
+combi$FamId[combi$FamSize == 2] <- 'Couples'
+# Somehow there are some families that don't match the FamSize
 # So let's delete erroneous family Ids
-tmp <- data.frame(table(combi$FamilyId))
+tmp <- data.frame(table(combi$FamId))
 Singles <- tmp[tmp$Freq <= 1,]
 Couples <- tmp[tmp$Freq == 2,]
-combi$FamilyId[combi$FamilyId %in% Singles$Var1] <- 'Singles'
-combi$FamilyId[combi$FamilyId %in% Couples$Var1] <- 'Couples'
-combi$FamilyId <- factor(combi$FamilyId)
+combi$FamId[combi$FamId %in% Singles$Var1] <- 'Singles'
+combi$FamId[combi$FamId %in% Couples$Var1] <- 'Couples'
+combi$FamId <- factor(combi$FamId)
 # Inspect new feature
-table(combi$FamilyId)
+table(combi$FamId)
 
 # Now continue with missing data treatment
 # Check what else might be missing
@@ -114,9 +114,9 @@ require(rpart)
 # Fill in Age NAs
 summary(combi$Age)
 # There seems to be 263 NAs
-# Age is likely related to Pclass, Sex, FamilySize, Title and maybe also where passengers embarked
+# Age is likely related to Pclass, Sex, FamSize, Title and maybe also where passengers embarked
 # Let's try this, following Trevor Stephens tutorial again
-Agefit <- rpart(Age ~ Pclass + Sex + SibSp + Parch + Fare + Embarked + Title + FamilySize,
+Agefit <- rpart(Age ~ Pclass + Sex + SibSp + Parch + Fare + Embarked + Title + FamSize,
                 data=combi[!is.na(combi$Age),], method="anova")
 combi$Age[is.na(combi$Age)] <- predict(Agefit, combi[is.na(combi$Age),])
 summary(combi$Age)
@@ -132,14 +132,14 @@ summary(combi$Embarked)
 
 # Fill in missing Fare data
 summary(combi$Fare)
-# Fare likely depends on Pclass, Embarked, and maybe Title and FamilySize
-Farefit <- rpart(Fare ~ Pclass + Embarked + Title + FamilySize,
-                data=combi[!is.na(combi$Fare),], method="anova")
+# Fare likely depends on Pclass, Embarked, and maybe Title and FamSize
+Farefit <- rpart(Fare ~ Pclass + Embarked + Title + FamSize,
+                 data=combi[!is.na(combi$Fare),], method="anova")
 combi$Fare[is.na(combi$Fare)] <- predict(Farefit, combi[is.na(combi$Fare),])
 summary(combi$Fare)
 
 # try to calculate Fare per person
-combi$Fare.pp <- combi$Fare/combi$FamilySize
+combi$Fare.pp <- combi$Fare/combi$FamSize
 
 # Add category Child
 combi$Child <- 0
@@ -162,7 +162,7 @@ summary(combi$Deck)
 
 # add new factor fate
 combi$Fate <- 'Perished'
-combi$Fate[which(is.na(combi$Survived))] <- "Unknown"
+combi$Fate[which(is.na(combi$Survived))] <- NA
 combi$Fate[which(combi$Survived==1)] <- "Survived"
 combi$Fate <- factor(combi$Fate)
 summary(combi$Fate)
@@ -177,23 +177,3 @@ test <- combi[(ntrain+1):ncombi,]
 
 save(train, file='titanic-train.RData')
 save(test, file='titanic-test.RData')
-#
-# # Install and load required packages
-# require(rattle)
-# require(rpart.plot)
-# require(RColorBrewer)
-#
-# # Build a new tree with our new features
-# fit <- rpart(Survived ~ Pclass + Sex + Age + Fare.pp + Embarked + Title + FamilySize + Boy + Girl, data=train, method="class")
-# fancyRpartPlot(fit)
-#
-# # Build condition inference tree Random Forest
-# library(party)
-# set.seed(013)
-# fit <- cforest(Survived ~ Pclass + Sex + Age + Fare.pp + Embarked + Title + FamilySize + Boy + Girl, data = train, controls=cforest_unbiased(ntree=100, mtry=3))
-#
-# # Now let's make a prediction and write a submission file
-# Prediction <- predict(fit, test, OOB=TRUE, type = "response")
-# submit <- data.frame(PassengerId = test$PassengerId, Survived = Prediction)
-# write.csv(submit, file = "finalciforest.csv", row.names = FALSE)
-#
